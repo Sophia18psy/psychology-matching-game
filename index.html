@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心理學概念翻翻樂 - 離線版</title>
+    <!-- 引入 React 和 ReactDOM CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 引入 Babel CDN，用於在瀏覽器中轉換 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定義字體 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* 自定義動畫 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pop 0.3s ease-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-scale-in {
+            animation: scaleIn 0.5s ease-out;
+        }
+        @keyframes bounceOnce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-once {
+            animation: bounceOnce 0.6s ease-out;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse {
+            animation: pulse 1s infinite;
+        }
+
+        /* Card specific styles */
+        .card-container {
+            perspective: 1000px; /* For 3D flip effect */
+        }
+        .card-inner {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            position: relative;
+        }
+        .card-container.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden; /* Safari */
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.75rem; /* rounded-xl */
+            font-weight: 600; /* font-semibold */
+            padding: 0.5rem; /* p-2 */
+            text-align: center;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+        }
+        .card-back {
+            background-color: #6d28d9; /* purple-700 */
+            color: white;
+            font-size: 1.5rem; /* text-2xl */
+        }
+        .card-front {
+            background-color: #f3f4f6; /* gray-100 */
+            color: #1f2937; /* gray-900 */
+            transform: rotateY(180deg);
+            border: 2px solid #e5e7eb; /* border-gray-200 */
+            font-size: 1rem; /* text-base */
+        }
+        .card-container.matched .card-front,
+        .card-container.matched .card-back {
+            opacity: 0.5;
+            cursor: default;
+        }
+        .card-container.matched .card-front {
+            background-color: #d1fae5; /* green-100 */
+            border-color: #34d399; /* green-500 */
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-orange-100 to-amber-300 min-h-screen flex items-center justify-center p-4">
+    <div id="root" class="w-full h-full flex items-center justify-center"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // 定義卡牌配對數據
+        const cardPairsData = [
+            { id: 'id_concept', content: '本我', matchId: 'id_def' },
+            { id: 'id_def', content: '追求立即滿足', matchId: 'id_concept' },
+            { id: 'ego_concept', content: '自我', matchId: 'ego_def' },
+            { id: 'ego_def', content: '遵循現實原則', matchId: 'ego_concept' },
+            { id: 'superego_concept', content: '超我', matchId: 'superego_def' },
+            { id: 'superego_def', content: '道德原則', matchId: 'superego_concept' },
+            { id: 'denial_concept', content: '否認', matchId: 'denial_def' },
+            { id: 'denial_def', content: '拒絕承認令人痛苦的現實', matchId: 'denial_concept' },
+            { id: 'rationalization_concept', content: '合理化', matchId: 'rationalization_def' },
+            { id: 'rationalization_def', content: '為行為找藉口', matchId: 'rationalization_concept' },
+            { id: 'sublimation_concept', content: '昇華作用', matchId: 'sublimation_def' },
+            { id: 'sublimation_def', content: '將衝動轉化為社會認可的行為', matchId: 'sublimation_concept' },
+            { id: 'oral_concept', content: '口腔期', matchId: 'oral_def' },
+            { id: 'oral_def', content: '透過吸吮獲得滿足', matchId: 'oral_concept' },
+            { id: 'anal_concept', content: '肛門期', matchId: 'anal_def' },
+            { id: 'anal_def', content: '如廁訓練的關鍵期', matchId: 'anal_concept' },
+        ];
+
+        // 遊戲初始時間（秒），可以調整
+        const INITIAL_GAME_TIME = 180; // 3 分鐘
+
+        const App = () => {
+            const [gameStarted, setGameStarted] = useState(false);
+            const [cards, setCards] = useState([]);
+            const [flippedCards, setFlippedCards] = useState([]); // 儲存已翻開的卡牌 ID
+            const [matchedPairsCount, setMatchedPairsCount] = useState(0);
+            const [moves, setMoves] = useState(0); // 翻牌次數
+            const [canFlip, setCanFlip] = useState(true); // 是否可以翻牌
+            const [gameFinished, setGameFinished] = useState(false);
+            const [timeLeft, setTimeLeft] = useState(INITIAL_GAME_TIME);
+            const timerRef = useRef(null);
+            const audioContextRef = useRef(null); // AudioContext 實例
+
+            // 初始化 AudioContext
+            useEffect(() => {
+                if (gameStarted && !audioContextRef.current) {
+                    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                return () => {
+                    if (audioContextRef.current) {
+                        audioContextRef.current.close();
+                        audioContextRef.current = null;
+                    }
+                };
+            }, [gameStarted]);
+
+            // 播放音效的通用函數
+            const playSound = useCallback((frequency, duration) => {
+                if (!audioContextRef.current) return;
+                const oscillator = audioContextRef.current.createOscillator();
+                const gainNode = audioContextRef.current.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContextRef.current.destination);
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, audioContextRef.current.currentTime);
+                gainNode.gain.setValueAtTime(1, audioContextRef.current.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContextRef.current.currentTime + duration);
+                oscillator.start(audioContextRef.current.currentTime);
+                oscillator.stop(audioContextRef.current.currentTime + duration);
+            }, []);
+
+            // 打亂卡牌
+            const shuffleCards = useCallback(() => {
+                const shuffled = [...cardPairsData]
+                    .sort(() => Math.random() - 0.5)
+                    .map(card => ({ ...card, isFlipped: false, isMatched: false }));
+                setCards(shuffled);
+            }, []);
+
+            // 初始化遊戲
+            const initializeGame = useCallback(() => {
+                setGameStarted(true);
+                shuffleCards();
+                setFlippedCards([]);
+                setMatchedPairsCount(0);
+                setMoves(0);
+                setCanFlip(true);
+                setGameFinished(false);
+                setTimeLeft(INITIAL_GAME_TIME);
+
+                if (timerRef.current) {
+                    clearInterval(timerRef.current);
+                }
+                timerRef.current = setInterval(() => {
+                    setTimeLeft(prevTime => {
+                        if (prevTime <= 1) {
+                            clearInterval(timerRef.current);
+                            setGameFinished(true);
+                            setGameStarted(false); // 遊戲結束
+                            playSound(150, 1.5); // 遊戲結束音效
+                            return 0;
+                        }
+                        return prevTime - 1;
+                    });
+                }, 1000);
+            }, [shuffleCards, playSound]);
+
+            // 處理卡牌點擊
+            const handleCardClick = useCallback((clickedCardId) => {
+                if (!canFlip || gameFinished) return;
+
+                const clickedCard = cards.find(card => card.id === clickedCardId);
+                if (!clickedCard || clickedCard.isFlipped || clickedCard.isMatched) return;
+
+                // 翻開卡牌
+                const newCards = cards.map(card =>
+                    card.id === clickedCardId ? { ...card, isFlipped: true } : card
+                );
+                setCards(newCards);
+                setFlippedCards(prev => [...prev, clickedCardId]);
+                setMoves(prev => prev + 1);
+
+            }, [cards, canFlip, gameFinished]);
+
+            // 檢查配對
+            useEffect(() => {
+                if (flippedCards.length === 2) {
+                    setCanFlip(false); // 暫時不能翻牌
+
+                    const [id1, id2] = flippedCards;
+                    const card1 = cards.find(card => card.id === id1);
+                    const card2 = cards.find(card => card.id === id2);
+
+                    if (card1.matchId === card2.id) {
+                        // 配對成功
+                        playSound(440, 0.1); // 答對音效
+                        setMatchedPairsCount(prev => prev + 1);
+                        setCards(prevCards =>
+                            prevCards.map(card =>
+                                card.id === id1 || card.id === id2 ? { ...card, isMatched: true } : card
+                            )
+                        );
+                        setFlippedCards([]);
+                        setCanFlip(true); // 恢復翻牌能力
+                    } else {
+                        // 配對失敗
+                        playSound(220, 0.2); // 答錯音效
+                        setTimeout(() => {
+                            setCards(prevCards =>
+                                prevCards.map(card =>
+                                    card.id === id1 || card.id === id2 ? { ...card, isFlipped: false } : card
+                                )
+                            );
+                            setFlippedCards([]);
+                            setCanFlip(true); // 恢復翻牌能力
+                        }, 1000); // 1 秒後翻回去
+                    }
+                }
+            }, [flippedCards, cards, playSound, setCards, setFlippedCards, setMatchedPairsCount, setCanFlip]);
+
+            // 檢查遊戲是否結束
+            useEffect(() => {
+                if (gameStarted && matchedPairsCount === cardPairsData.length / 2) {
+                    setGameFinished(true);
+                    setGameStarted(false); // 遊戲結束
+                    clearInterval(timerRef.current); // 停止計時器
+                    playSound(600, 1.5); // 遊戲成功音效
+                }
+            }, [matchedPairsCount, gameStarted, playSound]);
+
+            // 組件卸載時清除計時器和 AudioContext
+            useEffect(() => {
+                return () => {
+                    if (timerRef.current) {
+                        clearInterval(timerRef.current);
+                    }
+                    if (audioContextRef.current) {
+                        audioContextRef.current.close();
+                    }
+                };
+            }, []);
+
+            const formatTime = (seconds) => {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            };
+
+            const renderStartScreen = () => (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-orange-100 to-amber-300 p-4">
+                    <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full animate-fade-in">
+                        <h1 className="text-4xl font-extrabold text-gray-800 mb-6 font-inter">心理學概念翻翻樂</h1>
+                        <p className="text-lg text-gray-600 mb-8 font-inter">
+                            翻開卡牌，配對心理學概念與其定義！在最短時間內完成所有配對吧！
+                            <br/>
+                            你有 {formatTime(INITIAL_GAME_TIME)} 的時間。
+                        </p>
+                        <button
+                            onClick={initializeGame}
+                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300 ease-in-out font-inter"
+                        >
+                            開始遊戲
+                        </button>
+                    </div>
+                </div>
+            );
+
+            const renderGameScreen = () => (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-orange-100 to-amber-300 p-4">
+                    <div className="bg-white p-8 rounded-xl shadow-2xl max-w-4xl w-full animate-fade-in">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-gray-800 font-inter">翻翻樂挑戰</h2>
+                            <div className="flex flex-col items-end">
+                                <div className={`text-3xl font-bold font-inter ${timeLeft <= 30 && timeLeft > 0 ? 'text-red-600 animate-pulse' : 'text-purple-600'}`}>
+                                    時間: {formatTime(timeLeft)}
+                                </div>
+                                <div className="text-xl font-bold text-gray-700 font-inter mt-1">
+                                    翻牌次數: {moves}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-4 md:grid-cols-4 lg:grid-cols-4">
+                            {cards.map(card => (
+                                <div
+                                    key={card.id}
+                                    className={`card-container w-28 h-28 md:w-36 md:h-36 lg:w-40 lg:h-40 ${card.isFlipped || card.isMatched ? 'flipped' : ''} ${card.isMatched ? 'matched' : ''}`}
+                                    onClick={() => handleCardClick(card.id)}
+                                >
+                                    <div className="card-inner">
+                                        <div className="card-back">
+                                            <span>?</span>
+                                        </div>
+                                        <div className="card-front">
+                                            <span>{card.content}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderResultScreen = () => (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-orange-100 to-amber-300 p-4">
+                    <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full animate-scale-in">
+                        {matchedPairsCount === cardPairsData.length / 2 && timeLeft > 0 ? (
+                            <>
+                                <h1 className="text-4xl font-extrabold text-green-600 mb-6 font-inter animate-bounce-once">恭喜您！挑戰成功！</h1>
+                                <p className="text-2xl text-gray-700 mb-4 font-inter">
+                                    您成功配對了所有概念！
+                                </p>
+                                <p className="text-lg text-gray-600 mb-8 font-inter">
+                                    總共翻牌 {moves} 次，耗時 {formatTime(INITIAL_GAME_TIME - timeLeft)}。
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <h1 className="text-4xl font-extrabold text-red-600 mb-6 font-inter animate-shake">時間到！遊戲失敗！</h1>
+                                <p className="text-2xl text-gray-700 mb-4 font-inter">
+                                    很可惜，您沒有在時間內完成所有配對。
+                                </p>
+                                <p className="text-lg text-gray-600 mb-8 font-inter">
+                                    已配對 {matchedPairsCount} / {cardPairsData.length / 2} 對。
+                                </p>
+                            </>
+                        )}
+                        
+                        <button
+                            onClick={initializeGame}
+                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300 ease-in-out font-inter"
+                        >
+                            再玩一次
+                        </button>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="App">
+                    {/* Render screens based on game state */}
+                    {!gameStarted && !gameFinished && renderStartScreen()}
+                    {gameStarted && !gameFinished && renderGameScreen()}
+                    {gameFinished && renderResultScreen()}
+                </div>
+            );
+        };
+
+        // 將 React App 渲染到 HTML 頁面中的 'root' 元素
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
